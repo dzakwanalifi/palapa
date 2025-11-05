@@ -147,17 +147,17 @@
 - [x] Test Parlant journey dengan sample conversations
 
 ### 3.3 Routing & Weather Libraries
-- [ ] Review OSRM API endpoints documentation
-- [ ] Review route calculation API
-- [ ] Review distance matrix API
-- [ ] Review TSP (Traveling Salesman Problem) dengan OSRM
-- [ ] Review OpenWeatherMap API response format
-- [ ] Review caching strategies untuk weather data
-- [ ] Create `lib/routing.ts` - OSRM route optimization
-- [ ] Create `lib/weather.ts` - OpenWeatherMap API client
-- [ ] Implement TSP solver untuk route optimization
-- [ ] Test route optimization dengan sample destinations
-- [ ] Test weather API dengan sample coordinates
+- [x] Review OSRM API endpoints documentation
+- [x] Review route calculation API
+- [x] Review distance matrix API
+- [x] Review TSP (Traveling Salesman Problem) dengan OSRM
+- [x] Review OpenWeatherMap API response format
+- [x] Review caching strategies untuk weather data
+- [x] Create `lib/routing.ts` - OSRM route optimization
+- [x] Create `lib/weather.ts` - OpenWeatherMap API client
+- [x] Implement TSP solver untuk route optimization
+- [x] Test route optimization dengan sample destinations
+- [x] Test weather API dengan sample coordinates
 
 ### 3.4 State Management
 - [ ] Read Zustand official documentation

@@ -1,10 +1,13 @@
 // Test Parlant Components
+import 'dotenv/config'; // Load environment variables
 import { JourneyDefinitions } from '../lib/parlant/journeys';
 import { CulturalGuidelines } from '../lib/parlant/guidelines';
 import { CulturalDestinationRetriever } from '../lib/parlant/retrievers';
 
 async function testParlant() {
   console.log('🧪 Testing Parlant Components...\n');
+  console.log('🔍 GEMINI_API_KEY:', process.env.GEMINI_API_KEY ? 'SET' : 'NOT SET');
+  console.log('🔍 PERPLEXITY_API_KEY:', process.env.PERPLEXITY_API_KEY ? 'SET' : 'NOT SET');
 
   try {
     // Test 1: Journey Definitions

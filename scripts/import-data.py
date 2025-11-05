@@ -18,6 +18,7 @@ from tqdm import tqdm
 from typing import List, Dict, Any, Optional
 from firebase_admin import initialize_app, firestore, credentials
 from google import genai
+from google.genai import types
 
 # Constants
 BATCH_SIZE = 500  # Firestore batch write limit
