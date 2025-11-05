@@ -1,0 +1,47 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "destinations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "provinsi",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "isCultural",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "destinations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "category",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "provinsi",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "destinations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "provinsi",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "kotaKabupaten",
+          "order": "ASCENDING"
+        }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
