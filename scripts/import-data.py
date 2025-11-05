@@ -136,6 +136,7 @@ class PALAPADataImporter:
                     output_dimensionality=EMBEDDING_DIMENSION
                 )
             )
+            # For single content, embeddings[0] is ContentEmbedding object, we need .values
             return result.embeddings[0].values
         except Exception as e:
             print(f"⚠️  Failed to generate embedding for text: {text[:50]}... Error: {e}")
@@ -247,7 +248,11 @@ class PALAPADataImporter:
 
                 # Generate embedding
                 embedding = self.generate_embedding(embedding_text)
-                dest['embedding'] = embedding
+                # Convert to plain list if it's a ContentEmbedding object
+                if hasattr(embedding, 'values'):
+                    dest['embedding'] = list(embedding.values)
+                else:
+                    dest['embedding'] = list(embedding)
 
                 # Add to batch
                 doc_ref = self.db.collection('destinations').document()

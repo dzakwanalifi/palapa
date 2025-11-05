@@ -78,15 +78,17 @@
 - [x] Review batch writes best practices
 - [x] Review Gemini Embedding API documentation (gemini-embedding-001)
 - [x] Create Python script untuk import CSV ke Firestore
-- [ ] Setup Firebase Admin SDK di Python script
+- [x] Setup Firebase Admin SDK di Python script
 - [x] Load `wisata_indonesia_merged_clean.csv`
 - [x] Normalize data sesuai Firestore schema
 - [x] Generate embeddings untuk semua destinasi dengan Gemini Embedding 001
 - [x] Import embeddings ke FAISS index
 - [x] Import destinations ke Firestore dengan batch writes (500 docs/batch)
+- [x] Test import 10 destinations (berhasil dengan embeddings)
 - [x] Verify data import (check count, sample documents)
-- [ ] Create manual UMKM data (20-30 UMKM Yogyakarta)
-- [ ] Import UMKM data ke Firestore
+- [x] Fix embedding generation (ContentEmbedding object → plain list) ✅ VERIFIED
+- [x] Create manual UMKM data (20-30 UMKM Yogyakarta)
+- [x] Import UMKM data ke Firestore
 
 ### 2.3 FAISS Setup
 - [x] Review FAISS index creation dan management
@@ -158,6 +160,17 @@
 - [x] Implement TSP solver untuk route optimization
 - [x] Test route optimization dengan sample destinations
 - [x] Test weather API dengan sample coordinates
+
+### 3.4 Parlant Conversational AI System
+- [x] Create `lib/parlant/server.ts` - Parlant server setup
+- [x] Create `lib/parlant/agent.ts` - Agent configuration
+- [x] Create `lib/parlant/journeys.ts` - Journey definitions (5 journeys loaded ✅)
+- [x] Create `lib/parlant/guidelines.ts` - Cultural guidelines (35 guidelines loaded ✅)
+- [x] Implement Parlant journey untuk itinerary generation
+- [x] Test Parlant journey dengan sample conversations
+- [x] Create `lib/parlant/tools.ts` - Tool integrations
+- [x] Create `lib/parlant/retrievers.ts` - FAISS-based retrievers
+- [x] Test Parlant components (✅ All working: journeys, guidelines, retrievers, tools)
 
 ### 3.4 State Management
 - [ ] Read Zustand official documentation
@@ -578,6 +591,7 @@
 - [ ] Add more UMKM data
 - [ ] Implement advanced filtering
 - [ ] Add more language support
+- [x] Remove all hardcoded responses - use 100% AI-powered responses ✅
 - [ ] Improve AI responses dengan fine-tuning
 - [ ] Add more destination categories
 

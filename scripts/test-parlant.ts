@@ -1,5 +1,6 @@
 // Test Parlant Components
-import 'dotenv/config'; // Load environment variables
+import * as dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' }); // Load environment variables from .env.local
 import { JourneyDefinitions } from '../lib/parlant/journeys';
 import { CulturalGuidelines } from '../lib/parlant/guidelines';
 import { CulturalDestinationRetriever } from '../lib/parlant/retrievers';
