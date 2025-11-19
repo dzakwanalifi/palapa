@@ -43,3 +43,6 @@ yarn-error.log*
 # OS
 Thumbs.db
 
+# MCP configuration
+.mcp.json
+
