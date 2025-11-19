@@ -11,25 +11,20 @@ import {
   where,
   orderBy,
   limit,
-  startAfter,
   Timestamp,
   QueryConstraint,
-  DocumentData,
-  QueryDocumentSnapshot,
-  CollectionReference,
-  DocumentReference,
-  Query,
 } from 'firebase/firestore';
+import type { DocumentData } from 'firebase/firestore';
 import { db } from './firebase';
 import type {
   Destination,
-  UMKM,
-  UserProfile,
-  Itinerary,
-  GetDestinationsRequest,
   PaginationOptions,
   SearchFilters,
   SortOptions,
+  UMKM,
+  LocalGuide,
+  UserProfile,
+  Itinerary,
 } from '@/types';
 
 // Collection names
@@ -38,6 +33,7 @@ export const COLLECTIONS = {
   UMKM: 'umkm',
   USERS: 'users',
   ITINERARIES: 'itineraries',
+  LOCAL_GUIDES: 'local_guides',
 } as const;
 
 // Generic Firestore operations
@@ -155,7 +151,7 @@ export class DestinationService {
   static async getAll(options: PaginationOptions & {
     filters?: SearchFilters;
     sort?: SortOptions;
-  } = {}): Promise<{
+  } = { limit: 10 }): Promise<{
     destinations: Destination[];
     total: number;
     hasMore: boolean;
@@ -264,6 +260,34 @@ export class UMKMService {
   }
 }
 
+// Local Guide-specific functions
+export class LocalGuideService {
+  static async getById(id: string): Promise<LocalGuide | null> {
+    return FirestoreService.getDocument<LocalGuide>(COLLECTIONS.LOCAL_GUIDES, id);
+  }
+
+  static async getAll(limit = 50): Promise<LocalGuide[]> {
+    return FirestoreService.queryDocuments<LocalGuide>(
+      COLLECTIONS.LOCAL_GUIDES,
+      [],
+      { limit }
+    );
+  }
+
+  static async searchByName(name: string, limit = 20): Promise<LocalGuide[]> {
+    return FirestoreService.queryDocuments<LocalGuide>(
+      COLLECTIONS.LOCAL_GUIDES,
+      [],
+      { limit: 1000 }
+    ).then(guides =>
+      guides.filter(g =>
+        g.name.toLowerCase().includes(name.toLowerCase()) ||
+        (g.languages && g.languages.some(lang => lang.toLowerCase().includes(name.toLowerCase())))
+      ).slice(0, limit)
+    );
+  }
+}
+
 // User-specific functions
 export class UserService {
   static async getProfile(uid: string): Promise<UserProfile | null> {
@@ -315,6 +339,48 @@ export const createTimestamp = () => Timestamp.now();
 export const timestampToDate = (timestamp: Timestamp) => timestamp.toDate();
 
 export const dateToTimestamp = (date: Date) => Timestamp.fromDate(date);
+
+/**
+ * Serialize Firestore data for client-side consumption
+ * Converts Firestore Timestamp objects to ISO strings to avoid serialization errors
+ */
+export const serializeFirestoreData = <T extends Record<string, any>>(data: T): T => {
+  if (!data || typeof data !== 'object') {
+    return data;
+  }
+
+  const serialized = { ...data };
+
+  // Convert Firestore Timestamp objects to ISO strings
+  for (const key in serialized) {
+    const value = serialized[key];
+
+    // Check if it's a Firestore Timestamp object
+    if (value instanceof Timestamp) {
+      serialized[key] = value.toDate().toISOString() as any;
+    }
+    // Check if it's a plain object with toDate method (common pattern)
+    else if (value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') {
+      try {
+        serialized[key] = value.toDate().toISOString();
+      } catch {
+        // If toDate fails, keep original value
+      }
+    }
+    // Recursively serialize nested objects
+    else if (value && typeof value === 'object' && !Array.isArray(value)) {
+      serialized[key] = serializeFirestoreData(value);
+    }
+    // Recursively serialize arrays
+    else if (Array.isArray(value)) {
+      serialized[key] = value.map(item =>
+        typeof item === 'object' && item !== null ? serializeFirestoreData(item) : item
+      );
+    }
+  }
+
+  return serialized;
+};
 
 // Batch operations for large imports
 export class BatchService {

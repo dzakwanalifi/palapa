@@ -3,6 +3,9 @@
 
 import fs from 'fs';
 import path from 'path';
+import { createGeminiClient } from './gemini';
+// Hapus import fs/path jika Anda beralih ke Database Cloud (Firestore/Pinecone)
+// atau pertahankan jika ingin membaca file JSON vektor statis.
 import type { FAISSSearchResult, Category, Province } from '@/types';
 
 export interface FAISSConfig {
@@ -101,34 +104,35 @@ export class FAISSClient {
         metadataFilters
       } = options;
 
-      // In a real implementation, you'd generate embeddings for the query
-      // For now, we'll use a mock query vector
-      const queryVector = new Array(this.dimension).fill(0).map(() => Math.random());
+      // 1. Generate Embedding untuk Query User menggunakan Gemini
+      const gemini = createGeminiClient();
+      const embeddingResponse = await gemini.ai.models.embedContent({
+        model: "text-embedding-004", // Pastikan model ini aktif di Google AI Studio
+        content: { parts: [{ text: _query }] }
+      });
+      const queryVector = embeddingResponse.embedding.values;
 
-      // Search the index
-      const searchResult = this.index.search(queryVector, Math.min(limit * 3, this.indexMapping.length)); // Get more results for filtering
+      // 2. Logika Pencarian Vektor (Cosine Similarity Sederhana)
+      // Catatan: Untuk produksi skala besar, gunakan Vector DB (Pinecone/Milvus).
+      // Ini adalah implementasi in-memory untuk dataset kecil (<1000 item).
+      const results: FAISSSearchResult[] = this.indexMapping.map(item => {
+        // Asumsi: item.vector sudah ada di indexMapping dari proses indexing sebelumnya
+        if (!item.vector) return { ...item, score: 0 };
+        
+        // Hitung Cosine Similarity
+        const dotProduct = item.vector.reduce((sum: number, val: number, i: number) => sum + val * queryVector[i], 0);
+        // Asumsi vektor sudah ternormalisasi. Jika belum, bagi dengan magnitude.
+        return { ...item, score: dotProduct };
+      })
+      .filter(item => {
+        // Apply Threshold & Metadata Filters
+        const meetsThreshold = (item.score || 0) >= threshold;
+        return meetsThreshold && this.matchesFilters(item, metadataFilters);
+      })
+      .sort((a, b) => (b.score || 0) - (a.score || 0))
+      .slice(0, limit);
 
-      // Process results and apply filters
-      const results: FAISSSearchResult[] = [];
-
-      for (let i = 0; i < searchResult.indices[0].length; i++) {
-        const idx = searchResult.indices[0][i];
-        const score = searchResult.scores[0][i];
-
-        if (score >= threshold && idx < this.indexMapping.length) {
-          const result = { ...this.indexMapping[idx], score };
-
-          // Apply metadata filters
-          if (this.matchesFilters(result, metadataFilters)) {
-            results.push(result);
-          }
-        }
-      }
-
-      // Sort by score and limit results
-      return results
-        .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-        .slice(0, limit);
+      return results;
     } catch (error) {
       console.error('❌ FAISS search failed:', error);
       throw error;

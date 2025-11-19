@@ -51,19 +51,15 @@ export class ParlantAgentManager {
         return existingAgent;
       }
 
-      // Create new agent if not exists
-      // Note: In actual implementation, this would call Parlant API to create agent
-      // For now, we'll simulate with a mock agent object
-      const newAgent: ParlantAgent = {
-        id: 'palapa-agent-' + Date.now(),
+      // Buat agen baru via API Parlant
+      const newAgent = await parlantClient.request<ParlantAgent>('POST', '/agents', {
         name: 'PALAPA Cultural Assistant',
         description: 'AI assistant for Indonesian cultural tourism recommendations and itinerary planning',
-        max_engine_iterations: 5,
-        composition_mode: 'fluid'
-      };
+        max_engine_iterations: 5
+      });
 
       this.agentId = newAgent.id;
-      console.log('✅ Created new PALAPA agent:', newAgent.id);
+      console.log('✅ Created new PALAPA agent via API:', newAgent.id);
       return newAgent;
 
     } catch (error) {
@@ -167,7 +163,11 @@ export class ParlantAgentManager {
     // In actual implementation, this would create guidelines via Parlant API
     for (const guideline of guidelines) {
       console.log(`  ✓ ${guideline.condition.substring(0, 50)}...`);
-      // await parlantClient.createGuideline(this.agentId, guideline);
+      await parlantClient.request('POST', `/agents/${this.agentId}/guidelines`, {
+        condition: guideline.condition,
+        action: guideline.action,
+        enabled: guideline.enabled
+      });
     }
 
     console.log('✅ Cultural guidelines setup completed');

@@ -53,6 +53,30 @@
   kotaKabupaten: string,
   isCultural: boolean,
   umkmId: string | null,
+  facilities: {
+    wifi?: boolean,
+    toilet?: boolean,
+    parking?: boolean,
+    accessibility?: boolean,
+    restaurant?: boolean,
+    prayer_room?: boolean,
+    locker?: boolean,
+    guide_service?: boolean,
+    audio_guide?: boolean,
+    shop?: boolean
+  },
+  transport_modes?: string[],
+  best_visit_times?: string[],
+  ticket_pricing?: {
+    adult?: number,
+    child?: number,
+    senior?: number,
+    foreign_adult?: number,
+    foreign_child?: number,
+    currency?: string,
+    last_updated?: Timestamp,
+    notes?: string
+  },
   createdAt: Timestamp,
   updatedAt: Timestamp
 }

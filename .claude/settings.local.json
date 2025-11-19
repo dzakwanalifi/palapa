@@ -1,0 +1,20 @@
+{
+  "enabledMcpjsonServers": [
+    "Context7",
+    "sequential-thinking",
+    "perplexity-ask",
+    "everything",
+    "memory",
+    "cloud-run",
+    "github",
+    "chrome-devtools",
+    "next-devtools",
+    "figma",
+    "shadcn-ui"
+  ],
+  "permissions": {
+    "allow": [
+      "Bash(npm run dev)"
+    ]
+  }
+}

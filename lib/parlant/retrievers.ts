@@ -2,6 +2,7 @@
 // Retrieval-Augmented Generation retrievers that connect conversation context with FAISS search
 
 import { faissClient } from '../faiss';
+import { UMKMService } from '../firestore';
 import { FAISSSearchTool } from './tools';
 
 export interface RetrievalQuery {
@@ -400,40 +401,25 @@ export class UMKMRetriever {
   }
 
   private static async searchUMKM(preferences: any): Promise<any[]> {
-    // Mock UMKM search - in real implementation, this would query UMKM database
-    const mockUMKM = [
-      {
-        id: 'umkm_001',
-        name: 'Batik Trusmi Yogyakarta',
-        category: 'batik',
-        provinsi: 'di-yogyakarta',
-        description: 'Hand-drawn batik with traditional Yogyakarta motifs',
-        price_range: 'medium',
-        score: 0.9
-      },
-      {
-        id: 'umkm_002',
-        name: 'Perak Kotagede',
-        category: 'kerajinan',
-        provinsi: 'di-yogyakarta',
-        description: 'Traditional silver jewelry with Javanese designs',
-        price_range: 'high',
-        score: 0.85
-      }
-    ];
+    // Ambil semua data real dari Firestore
+    // Optimasi: Di production, gunakan filter Firestore (.where) langsung di query
+    const allUMKM = await UMKMService.getAll(50); 
 
-    return mockUMKM.filter(umkm => {
-      const matchesCategory = preferences.categories.length === 0 ||
+    return allUMKM.filter(umkm => {
+      const categoryMatch = preferences.categories.length === 0 || 
         preferences.categories.includes(umkm.category);
+      
+      // Simple inclusion check untuk lokasi
+      // Di production, gunakan Geo-query firestore
+      const locationMatch = !preferences.location || 
+         (umkm as any).address?.toLowerCase().includes(preferences.location.toLowerCase());
 
-      const matchesLocation = !preferences.location ||
-        umkm.provinsi.toLowerCase().includes(preferences.location.toLowerCase());
-
-      const matchesBudget = !preferences.budget ||
-        umkm.price_range === preferences.budget;
-
-      return matchesCategory && matchesLocation && matchesBudget;
-    });
+      return categoryMatch && locationMatch;
+    }).map(umkm => ({
+      ...umkm,
+      // Berikan skor relevansi artifisial jika belum ada vektor
+      score: 0.85 
+    }));
   }
 
   private static enhanceUMKMResults(results: any[], preferences: any): any[] {

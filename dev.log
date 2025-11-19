@@ -1,0 +1,12 @@
+
+> budaya-go@1.0.0 dev
+> next dev
+
+ ⚠ Port 3000 is in use by process 17588, using available port 3002 instead.
+   ▲ Next.js 15.5.6
+   - Local:        http://localhost:3002
+   - Network:      http://10.100.1.22:3002
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 3.3s

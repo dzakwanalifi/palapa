@@ -9,7 +9,11 @@
     "test:auth": "node scripts/test-auth.js",
     "test:api": "node scripts/test-api-connections.js",
     "test:types": "npx tsx scripts/test-types-simple.ts",
-    "emulator": "firebase emulators:start --only firestore --project palapa-budayago"
+    "emulator": "firebase emulators:start --only firestore --project palapa-budayago",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
   },
   "keywords": [],
   "author": "",
@@ -17,11 +21,32 @@
   "type": "commonjs",
   "dependencies": {
     "@google/genai": "^1.28.0",
+    "@radix-ui/react-slot": "^1.2.4",
+    "@radix-ui/react-switch": "^1.2.6",
+    "@tailwindcss/postcss": "^4.1.17",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "dotenv": "^17.2.3",
     "firebase": "^12.5.0",
-    "firebase-admin": "^13.5.0"
+    "firebase-admin": "^13.5.0",
+    "framer-motion": "^12.23.24",
+    "lucide-react": "^0.554.0",
+    "maplibre-gl": "^4.0.0",
+    "next": "^15.0.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "tailwind-merge": "^3.4.0",
+    "zustand": "^4.5.0"
   },
   "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "autoprefixer": "^10.4.22",
+    "eslint": "^8.0.0",
+    "eslint-config-next": "^15.0.0",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.17",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
   }

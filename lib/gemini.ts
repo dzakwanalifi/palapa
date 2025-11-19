@@ -22,6 +22,9 @@ export interface GeminiItineraryRequest {
     budget_priority?: 'low' | 'medium' | 'high';
     pace?: 'relaxed' | 'moderate' | 'intense';
   };
+  transport_mode?: string; // mobil_pribadi, transportasi_umum, dll
+  start_date?: string; // YYYY-MM-DD format
+  end_date?: string; // YYYY-MM-DD format
 }
 
 export interface GeminiItineraryResponse {
@@ -56,6 +59,29 @@ export interface Destination {
   provinsi: string;
   isCultural: boolean;
   description?: string;
+  facilities?: {
+    wifi?: boolean;
+    toilet?: boolean;
+    parking?: boolean;
+    accessibility?: boolean;
+    restaurant?: boolean;
+    prayer_room?: boolean;
+    locker?: boolean;
+    guide_service?: boolean;
+    audio_guide?: boolean;
+    shop?: boolean;
+  };
+  transport_modes?: string[];
+  best_visit_times?: string[];
+  ticket_pricing?: {
+    adult?: number;
+    child?: number;
+    senior?: number;
+    foreign_adult?: number;
+    foreign_child?: number;
+    currency?: string;
+    notes?: string;
+  };
   estimated_time?: number;
   estimated_cost?: number;
 }
@@ -81,6 +107,41 @@ const itinerarySchema: Schema = {
                 provinsi: { type: Type.STRING },
                 isCultural: { type: Type.BOOLEAN },
                 description: { type: Type.STRING },
+                facilities: {
+                  type: Type.OBJECT,
+                  properties: {
+                    wifi: { type: Type.BOOLEAN },
+                    toilet: { type: Type.BOOLEAN },
+                    parking: { type: Type.BOOLEAN },
+                    accessibility: { type: Type.BOOLEAN },
+                    restaurant: { type: Type.BOOLEAN },
+                    prayer_room: { type: Type.BOOLEAN },
+                    locker: { type: Type.BOOLEAN },
+                    guide_service: { type: Type.BOOLEAN },
+                    audio_guide: { type: Type.BOOLEAN },
+                    shop: { type: Type.BOOLEAN }
+                  }
+                },
+                transport_modes: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING }
+                },
+                best_visit_times: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING }
+                },
+                ticket_pricing: {
+                  type: Type.OBJECT,
+                  properties: {
+                    adult: { type: Type.NUMBER },
+                    child: { type: Type.NUMBER },
+                    senior: { type: Type.NUMBER },
+                    foreign_adult: { type: Type.NUMBER },
+                    foreign_child: { type: Type.NUMBER },
+                    currency: { type: Type.STRING },
+                    notes: { type: Type.STRING }
+                  }
+                },
                 estimated_time: { type: Type.NUMBER },
                 estimated_cost: { type: Type.NUMBER }
               },
@@ -496,10 +557,23 @@ Answer comprehensively but concisely.`;
       preferred_categories,
       provinsi,
       user_preferences = {},
-      existing_destinations = []
+      existing_destinations = [],
+      transport_mode,
+      start_date,
+      end_date
     } = request;
 
-    let prompt = `Buat itinerary perjalanan wisata budaya di Indonesia untuk ${duration_days} hari dengan budget Rp ${budget.toLocaleString('id-ID')}.
+    let prompt = `Buat itinerary perjalanan wisata budaya di Indonesia untuk ${duration_days} hari dengan budget Rp ${budget.toLocaleString('id-ID')}.`;
+
+    if (start_date && end_date) {
+      prompt += `\nPeriode perjalanan: ${start_date} sampai ${end_date}`;
+    }
+
+    if (transport_mode) {
+      prompt += `\nMode transportasi utama: ${transport_mode}`;
+    }
+
+    prompt += `
 
 PREFERENSI USER:
 - Kategori: ${preferred_categories.join(', ')}
@@ -546,6 +620,24 @@ OUTPUT HARUS DALAM FORMAT JSON:
           "provinsi": "provinsi_name",
           "isCultural": true,
           "description": "Deskripsi singkat",
+          "facilities": {
+            "wifi": true,
+            "toilet": true,
+            "parking": true,
+            "restaurant": false,
+            "guide_service": true
+          },
+          "transport_modes": ["mobil_pribadi", "taksi"],
+          "best_visit_times": ["pagi", "siang"],
+          "ticket_pricing": {
+            "adult": 25000,
+            "child": 15000,
+            "senior": 20000,
+            "foreign_adult": 75000,
+            "foreign_child": 35000,
+            "currency": "IDR",
+            "notes": "Harga tiket masuk termasuk guide audio"
+          },
           "estimated_time": 120,
           "estimated_cost": 50000
         }

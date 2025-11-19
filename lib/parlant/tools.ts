@@ -5,6 +5,8 @@ import { createGeminiClient } from '../gemini';
 import { createPerplexityClient } from '../perplexity';
 import { faissClient } from '../faiss';
 import { PromptTemplates } from '../prompts';
+import { routeOptimizer } from '../routing';
+import { UMKMService } from '../firestore';
 
 export interface ToolContext {
   agent_id: string;
@@ -349,9 +351,20 @@ export class UMKMSearchTool {
     const startTime = Date.now();
 
     try {
-      // In a real implementation, this would search a UMKM database
-      // For now, we'll simulate with predefined results
-      const umkmResults = this.getMockUMKMResults(query, options);
+      // Ganti baris const umkmResults = this.getMockUMKMResults(...) menjadi:
+      let umkmResults = await UMKMService.getAll();
+
+      // Filter manual (karena firestore search terbatas)
+      if (query) {
+        const lowerQ = query.toLowerCase();
+        umkmResults = umkmResults.filter(u => 
+          u.name.toLowerCase().includes(lowerQ) || 
+          u.category.toLowerCase().includes(lowerQ)
+        );
+      }
+
+      // Batasi hasil
+      umkmResults = umkmResults.slice(0, options?.max_results || 5);
 
       const executionTime = Date.now() - startTime;
 
@@ -382,56 +395,6 @@ export class UMKMSearchTool {
       };
     }
   }
-
-  private static getMockUMKMResults(query: string, options?: any): any[] {
-    // Mock UMKM data - in real implementation, this would query a database
-    const mockUMKM = [
-      {
-        id: 'umkm_001',
-        name: 'Batik Trusmi Cirebon',
-        category: 'batik',
-        location: 'Cirebon, Jawa Barat',
-        description: 'Batik tulis handmade dengan motif tradisional Cirebon',
-        price_range: 'Rp 500.000 - Rp 2.000.000',
-        contact: '+62 812-3456-7890'
-      },
-      {
-        id: 'umkm_002',
-        name: 'Perak Yogyakarta',
-        category: 'kerajinan',
-        location: 'Yogyakarta',
-        description: 'Perhiasan perak dengan desain Jawa klasik',
-        price_range: 'Rp 100.000 - Rp 1.000.000',
-        contact: '+62 811-2345-6789'
-      },
-      {
-        id: 'umkm_003',
-        name: 'Tenun Ikat Bali',
-        category: 'tenun',
-        location: 'Gianyar, Bali',
-        description: 'Kain tenun ikat dengan pewarna alami',
-        price_range: 'Rp 300.000 - Rp 800.000',
-        contact: '+62 813-4567-8901'
-      }
-    ];
-
-    // Filter based on query and options
-    return mockUMKM.filter(umkm => {
-      const matchesQuery = query.toLowerCase().split(' ').some(word =>
-        umkm.name.toLowerCase().includes(word) ||
-        umkm.category.toLowerCase().includes(word) ||
-        umkm.description.toLowerCase().includes(word)
-      );
-
-      const matchesCategory = !options?.category ||
-        umkm.category.toLowerCase().includes(options.category.toLowerCase());
-
-      const matchesLocation = !options?.location ||
-        umkm.location.toLowerCase().includes(options.location.toLowerCase());
-
-      return matchesQuery && matchesCategory && matchesLocation;
-    }).slice(0, options?.max_results || 5);
-  }
 }
 
 /**
@@ -448,9 +411,14 @@ export class RouteOptimizationTool {
     const startTime = Date.now();
 
     try {
-      // In a real implementation, this would use OSRM or GraphHopper API
-      // For now, we'll simulate route optimization
-      const optimizedRoute = this.optimizeRoute(destinations);
+      // Mapping format destinations ke format yang diminta routeOptimizer
+      const formattedDestinations = destinations.map(d => ({
+        coordinate: { lat: d.lat, lng: d.lng },
+        name: d.name
+      }));
+
+      // Panggil library routing asli (OSRM)
+      const result = await routeOptimizer.optimizeRoute(formattedDestinations);
 
       const executionTime = Date.now() - startTime;
 
@@ -458,11 +426,12 @@ export class RouteOptimizationTool {
         success: true,
         data: {
           original_destinations: destinations,
-          optimized_route: optimizedRoute,
-          total_distance: this.calculateTotalDistance(optimizedRoute),
-          estimated_time: this.estimateTravelTime(optimizedRoute)
+          optimized_route: result.waypoints, // Waypoints sudah terurut
+          total_distance: result.totalDistance, // Dalam meter
+          estimated_time: result.estimatedTime, // Dalam detik
+          geometry: result.route.geometry // Untuk digambar di peta
         },
-        message: `Optimized route for ${destinations.length} destinations`,
+        message: `Optimized route calculated via OSRM. Distance: ${(result.totalDistance/1000).toFixed(1)}km`,
         metadata: {
           tool_name: 'route_optimization',
           execution_time: executionTime

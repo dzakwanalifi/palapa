@@ -28,7 +28,7 @@ export class JourneyDefinitions {
         {
           id: 'gather_basic_info',
           type: 'chat',
-          content: 'Untuk membuat itinerary yang sempurna untuk Anda, saya perlu tahu:\n\n• 🗓️ Berapa hari Anda memiliki waktu untuk berpergian?\n• 💰 Kisaran budget Anda per orang?\n• 🎯 Aspek budaya apa yang paling menarik? (candi, keraton, seni tradisional, kuliner, dll)\n• 📍 Pulau atau daerah mana yang Anda minati?\n\nCeritakan sedikit tentang preferensi Anda!'
+          content: 'Untuk membuat itinerary yang sempurna untuk Anda, saya perlu tahu:\n\n• 🗓️ Berapa hari Anda memiliki waktu untuk berpergian?\n• 💰 Kisaran budget Anda per orang?\n• 🎯 Aspek budaya apa yang paling menarik? (candi, keraton, seni tradisional, kuliner, dll)\n• 📍 Pulau atau daerah mana yang Anda minati?\n• 🚗 Bagaimana rencana transportasi Anda? (mobil pribadi, transportasi umum, rental mobil)\n• 📅 Kapan rencana keberangkatan dan kepulangan Anda?\n\nCeritakan sedikit tentang preferensi Anda!'
         },
         {
           id: 'analyze_preferences',

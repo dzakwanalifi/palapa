@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 PALAPA Data Import Script
 Import CSV data to Firestore and FAISS
@@ -11,6 +12,11 @@ import os
 import sys
 import json
 from dotenv import load_dotenv
+
+# Fix for Windows Unicode issues
+if sys.stdout.encoding != 'utf-8':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 import pandas as pd
 import numpy as np
 import faiss
@@ -19,10 +25,12 @@ from typing import List, Dict, Any, Optional
 from firebase_admin import initialize_app, firestore, credentials
 from google import genai
 from google.genai import types
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
+import multiprocessing
 
 # Constants
 BATCH_SIZE = 500  # Firestore batch write limit
-EMBEDDING_MODEL = "gemini-embedding-001"
+EMBEDDING_MODEL = "text-embedding-004"  # Updated model
 EMBEDDING_DIMENSION = 768
 
 class PALAPADataImporter:
@@ -93,8 +101,8 @@ class PALAPADataImporter:
         # Try to map common column name variations
         column_mapping = {
             'Place_Name': ['name', 'Place_Name', 'place_name', 'nama', 'Name', 'nama_tempat'],
-            'Latitude': ['latitude', 'Latitude', 'lat', 'koordinat_lat'],
-            'Longitude': ['longitude', 'Longitude', 'lng', 'lon', 'koordinat_lng'],
+            'Latitude': ['latitude', 'Latitude', 'lat', 'Lat', 'koordinat_lat'],
+            'Longitude': ['longitude', 'Longitude', 'lng', 'lon', 'Long', 'koordinat_lng'],
             'Description': ['description', 'Description', 'deskripsi', 'detail'],
             'Category': ['category', 'Category', 'kategori', 'jenis'],
             'Price': ['priceRange', 'Price', 'price', 'harga', 'biaya'],
@@ -127,21 +135,56 @@ class PALAPADataImporter:
 
     def generate_embedding(self, text: str) -> List[float]:
         """Generate embedding for text using Gemini"""
-        try:
-            result = self.genai_client.models.embed_content(
-                model=EMBEDDING_MODEL,
-                contents=text,
-                config=types.EmbedContentConfig(
-                    task_type="RETRIEVAL_DOCUMENT",
-                    output_dimensionality=EMBEDDING_DIMENSION
+        for attempt in range(1, 4):
+            try:
+                # create client per-call to avoid issues in threaded contexts
+                client = genai.Client(api_key=os.getenv('GEMINI_API_KEY'))
+                result = client.models.embed_content(
+                    model=EMBEDDING_MODEL,
+                    content=text
                 )
-            )
-            # For single content, embeddings[0] is ContentEmbedding object, we need .values
-            return result.embeddings[0].values
-        except Exception as e:
-            print(f"⚠️  Failed to generate embedding for text: {text[:50]}... Error: {e}")
-            # Return zero vector as fallback
-            return [0.0] * EMBEDDING_DIMENSION
+                return result.embeddings[0].values
+
+            except Exception as e:
+                print(f"⚠️  Failed to generate embedding (attempt {attempt}/3) for text: {text[:50]}... Error: {e}")
+                if attempt < 3:
+                    import time
+                    time.sleep(1.0 * attempt)
+                else:
+                    # Return zero vector as fallback after retries
+                    return [0.0] * EMBEDDING_DIMENSION
+
+    def generate_embeddings_batch(self, texts: List[str], max_workers: int = None) -> List[List[float]]:
+        """Generate embeddings for multiple texts using threads with per-item progress"""
+        cpu = multiprocessing.cpu_count()
+        max_workers = max_workers or min(cpu, 10)
+        print(f"🤖 Generating embeddings for {len(texts)} texts using {max_workers} threads...")
+
+        embeddings = [None] * len(texts)
+
+        def _worker(idx: int, txt: str):
+            return idx, self.generate_embedding(txt)
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(_worker, i, t): i for i, t in enumerate(texts)}
+            with tqdm(total=len(texts), desc="Generating embeddings") as pbar:
+                for fut in as_completed(futures):
+                    try:
+                        idx, emb = fut.result()
+                        embeddings[idx] = emb
+                    except Exception as e:
+                        print(f"⚠️  Embedding worker failed: {e}")
+                        embeddings[futures[fut]] = [0.0] * EMBEDDING_DIMENSION
+                    pbar.update(1)
+
+        # Ensure no None
+        for i in range(len(embeddings)):
+            if embeddings[i] is None:
+                embeddings[i] = [0.0] * EMBEDDING_DIMENSION
+
+        return embeddings
+
+    # _generate_embeddings_for_chunk is no longer used but kept for reference
 
     def search_faiss(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
         """Search FAISS index"""
@@ -186,8 +229,18 @@ class PALAPADataImporter:
             'provinsi': str(row.get('Provinsi', '')),
             'kotaKabupaten': str(row.get('City', '')),
             'isCultural': self._is_cultural(str(row.get('Category', ''))),
-            'umkmId': None
+            'umkmId': None,
         }
+
+        # Generate additional data using Gemini AI
+        generated_data = self._generate_destination_data_with_gemini(
+            str(row.get('Category', '')), 
+            str(row.get('Price', '')), 
+            str(row.get('Place_Name', ''))
+        )
+
+        # Add generated data to destination
+        destination.update(generated_data)
 
         return destination
 
@@ -228,44 +281,179 @@ class PALAPADataImporter:
         cultural_categories = ['budaya', 'religius', 'candi', 'museum', 'keraton']
         return any(cultural in category.lower() for cultural in cultural_categories)
 
+    def _generate_with_gemini(self, prompt: str, retries: int = 3, backoff: float = 1.0) -> str:
+        """Generate content using Gemini AI (with retries). Uses gemini-2.5-flash-lite."""
+        model_name = "gemini-2.5-flash-lite"
+
+        for attempt in range(1, retries + 1):
+            try:
+                # We use the client stored on the instance; create fallback client if missing
+                client = self.genai_client or genai.Client(api_key=os.getenv('GEMINI_API_KEY'))
+
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt
+                )
+
+                if response and getattr(response, 'text', None):
+                    return response.text.strip()
+                else:
+                    print(f"⚠️  Empty response from Gemini (attempt {attempt})")
+
+            except Exception as e:
+                print(f"⚠️  Failed to generate with Gemini (attempt {attempt}/{retries}): {e}")
+
+            # Backoff before retrying
+            if attempt < retries:
+                import time
+                time.sleep(backoff * attempt)
+
+        return ""
+
+    def _generate_destination_data_with_gemini(self, category: str, price_range: str, name: str = "") -> Dict[str, Any]:
+        """Generate all destination data using Gemini AI in a single prompt"""
+        prompt = f"""
+        Generate comprehensive data for this tourism destination in Indonesia.
+
+        Destination: "{name}"
+        Category: "{category}"
+        Price range: "{price_range}"
+
+        Return ONLY a valid JSON object with this exact structure (no explanations, no markdown, no additional text):
+
+        {{
+            "facilities": {{
+                "wifi": true,
+                "toilet": true,
+                "parking": true,
+                "accessibility": false,
+                "restaurant": false,
+                "prayer_room": false,
+                "locker": false,
+                "guide_service": false,
+                "audio_guide": false,
+                "shop": false
+            }},
+            "transport_modes": ["mobil_pribadi", "taksi", "jalan_kaki"],
+            "best_visit_times": ["pagi", "siang", "sore"],
+            "ticket_pricing": {{
+                "currency": "IDR",
+                "adult": 20000,
+                "child": 10000,
+                "senior": 15000,
+                "foreign_adult": 50000,
+                "foreign_child": 25000,
+                "notes": ""
+            }}
+        }}
+        """
+
+        response = self._generate_with_gemini(prompt)
+        # Try to extract JSON if wrapped in code blocks or has extra text
+        import re
+        json_match = re.search(r'\{.*\}', response, re.DOTALL)
+        if json_match:
+            response = json_match.group(0)
+
+        try:
+            data = json.loads(response)
+            # Validate and provide defaults for missing fields
+            default_data = {
+                'facilities': {
+                    'wifi': False,
+                    'toilet': True,
+                    'parking': True,
+                    'accessibility': False,
+                    'restaurant': False,
+                    'prayer_room': False,
+                    'locker': False,
+                    'guide_service': False,
+                    'audio_guide': False,
+                    'shop': False
+                },
+                'transport_modes': ["mobil_pribadi", "taksi", "jalan_kaki"],
+                'best_visit_times': ["pagi", "siang", "sore"],
+                'ticket_pricing': {
+                    'currency': 'IDR',
+                    'adult': 20000,
+                    'child': 10000,
+                    'senior': 15000,
+                    'foreign_adult': 50000,
+                    'foreign_child': 25000,
+                    'notes': ''
+                }
+            }
+
+            # Update defaults with generated data
+            if 'facilities' in data:
+                default_data['facilities'].update(data['facilities'])
+            if 'transport_modes' in data and isinstance(data['transport_modes'], list):
+                default_data['transport_modes'] = data['transport_modes']
+            if 'best_visit_times' in data and isinstance(data['best_visit_times'], list):
+                default_data['best_visit_times'] = data['best_visit_times']
+            if 'ticket_pricing' in data:
+                default_data['ticket_pricing'].update(data['ticket_pricing'])
+
+            return default_data
+
+        except json.JSONDecodeError:
+            print(f"⚠️  Failed to parse generated data JSON for {name}, response: {response[:200]}..., using defaults")
+            return {
+                'facilities': {
+                    'wifi': False,
+                    'toilet': True,
+                    'parking': True,
+                    'accessibility': False,
+                    'restaurant': False,
+                    'prayer_room': False,
+                    'locker': False,
+                    'guide_service': False,
+                    'audio_guide': False,
+                    'shop': False
+                },
+                'transport_modes': ["mobil_pribadi", "taksi", "jalan_kaki"],
+                'best_visit_times': ["pagi", "siang", "sore"],
+                'ticket_pricing': {
+                    'currency': 'IDR',
+                    'adult': 20000,
+                    'child': 10000,
+                    'senior': 15000,
+                    'foreign_adult': 50000,
+                    'foreign_child': 25000,
+                    'notes': ''
+                }
+            }
+
     def import_to_firestore(self, destinations: List[Dict[str, Any]]) -> List[str]:
         """Import destinations to Firestore in batches"""
         print(f"💾 Importing {len(destinations)} destinations to Firestore...")
+        # Generate embeddings for all destinations first (with per-item progress)
+        embedding_texts = [
+            f"{dest['name']} {dest['description']} {dest['category']} {dest['provinsi']}"
+            for dest in destinations
+        ]
+
+        embeddings = self.generate_embeddings_batch(embedding_texts)
+
+        # Add embeddings to destinations
+        for dest, embedding in zip(destinations, embeddings):
+            dest['embedding'] = embedding
 
         document_ids = []
 
-        # Process in batches
-        for i in tqdm(range(0, len(destinations), BATCH_SIZE), desc="Firestore Import"):
-            batch = destinations[i:i + BATCH_SIZE]
-            batch_ids = []
-
-            # Create batch write
-            firestore_batch = self.db.batch()
-
-            for dest in batch:
-                # Generate text for embedding
-                embedding_text = f"{dest['name']} {dest['description']} {dest['category']} {dest['provinsi']}"
-
-                # Generate embedding
-                embedding = self.generate_embedding(embedding_text)
-                # Convert to plain list if it's a ContentEmbedding object
-                if hasattr(embedding, 'values'):
-                    dest['embedding'] = list(embedding.values)
-                else:
-                    dest['embedding'] = list(embedding)
-
-                # Add to batch
-                doc_ref = self.db.collection('destinations').document()
-                firestore_batch.set(doc_ref, dest)
-                batch_ids.append(doc_ref.id)
-
-            # Commit batch
+        # Upload documents one-by-one so progress is visible per item
+        from time import sleep
+        for dest in tqdm(destinations, desc="Uploading to Firestore"):
             try:
-                firestore_batch.commit()
-                document_ids.extend(batch_ids)
+                doc_ref = self.db.collection('destinations').document()
+                doc_ref.set(dest)
+                document_ids.append(doc_ref.id)
             except Exception as e:
-                print(f"❌ Failed to commit batch {i//BATCH_SIZE + 1}: {e}")
+                print(f"❌ Failed to upload document for '{dest.get('name', '')}': {e}")
+                # continue with next document
                 continue
+            # Optional slight delay to be gentle with API rate limits
+            sleep(0.01)
 
         print(f"✅ Successfully imported {len(document_ids)} destinations to Firestore")
         return document_ids
