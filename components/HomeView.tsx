@@ -12,11 +12,13 @@ interface HomeViewProps {
     onCategoryChange: (category: string) => void;
     onMenuNavigate: (page: string) => void;
     showItinerary: boolean;
+    isMenuOpen?: boolean;
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({
     onMenuNavigate,
-    showItinerary
+    showItinerary,
+    isMenuOpen = false
 }) => {
     return (
         <AnimatePresence>
@@ -27,25 +29,13 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 className="absolute inset-0 z-10 flex flex-col pointer-events-none"
             >
                 {/* Gradient Blur - Base layer */}
-                <div className="pointer-events-none absolute top-0 left-0 right-0 h-32 z-10 bg-gradient-to-b from-white/70 via-white/40 to-transparent" />
+                <div className="pointer-events-none absolute top-0 left-0 right-0 h-[20vh] z-10 bg-gradient-to-b from-white from-0% via-white via-50% to-transparent" />
 
                 {/* Header - Stacked on top of gradient */}
                 <div className="pointer-events-auto absolute top-0 left-0 right-0 z-20">
                     <Header onMenuNavigate={onMenuNavigate} />
                 </div>
 
-                {/* Sapaan Section - Stacked on top of gradient */}
-                <div className="pointer-events-none absolute top-16 left-0 right-0 px-6 z-20">
-                    <motion.div
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.2 }}
-                        className="space-y-1"
-                    >
-                        <p className="text-sm font-medium text-slate-700">Hi Traveler 👋</p>
-                        <h2 className="text-lg font-bold text-slate-900">Mari jelajahi destinasi seru!</h2>
-                    </motion.div>
-                </div>
 
                 {/* Rest is map background - pointer-events-none */}
                 <div className="flex-1" />

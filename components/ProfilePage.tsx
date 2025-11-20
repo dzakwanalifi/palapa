@@ -8,23 +8,29 @@ import { useAuth } from '@/context/AuthContext';
 
 interface ProfilePageProps {
     onBack: () => void;
+    currentUser?: string | null;
+    onLogout?: () => void;
 }
 
-export const ProfilePage: React.FC<ProfilePageProps> = ({ onBack }) => {
+export const ProfilePage: React.FC<ProfilePageProps> = ({ onBack, currentUser, onLogout }) => {
     const { user, signOut } = useAuth();
 
-    const displayName = user?.displayName || user?.email?.split('@')[0] || 'User';
-    const avatarName = user?.displayName || 'User';
-    const email = user?.email || 'user@example.com';
+    const displayName = currentUser || user?.displayName || user?.email?.split('@')[0] || 'User';
+    const avatarName = currentUser || user?.displayName || 'User';
+    const email = user?.email || 'test@example.com';
     const phoneNumber = '+62 812 3456 7890'; // Would come from Firestore UserProfile
     const city = 'Yogyakarta, Indonesia'; // Would come from Firestore UserProfile
 
     const handleSignOut = async () => {
-        try {
-            await signOut();
-            onBack();
-        } catch (error) {
-            console.error('Sign out error:', error);
+        if (onLogout) {
+            onLogout();
+        } else {
+            try {
+                await signOut();
+                onBack();
+            } catch (error) {
+                console.error('Sign out error:', error);
+            }
         }
     };
 
@@ -44,7 +50,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onBack }) => {
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto px-6 py-6 pb-28">
                 <div className="flex flex-col items-center mb-8">
                     <div className="w-24 h-24 rounded-full bg-slate-200 mb-4 overflow-hidden border-4 border-white shadow-lg">
                         <img

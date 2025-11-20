@@ -17,9 +17,9 @@ export const Logo: React.FC<LogoProps> = ({
   className = ''
 }) => {
   const sizeMap = {
-    sm: { width: 24, height: 30 },
-    md: { width: 32, height: 40 },
-    lg: { width: 48, height: 60 }
+    sm: { width: 75, height: 31 },
+    md: { width: 100, height: 41 },
+    lg: { width: 150, height: 62 }
   };
 
   const textSizeMap = {
@@ -33,11 +33,12 @@ export const Logo: React.FC<LogoProps> = ({
     <div className={`flex items-center gap-2 ${className}`}>
       <div className="relative" style={{ width: dims.width, height: dims.height }}>
         <Image
-          src="/figma-assets/logo-budaya-go-19f67d.png"
+          src="/logo-login.png"
           alt="Budaya GO Logo"
           width={dims.width}
           height={dims.height}
           priority
+          style={{ width: 'auto', height: '100%' }}
           className="object-contain"
         />
       </div>

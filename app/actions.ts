@@ -43,6 +43,113 @@ export async function generateTripPlan(request: GeminiItineraryRequest) {
     }
 }
 
+/**
+ * Generate multiple themed itinerary options
+ * Provides 3 variations: Cultural-focused, Balanced, and Relaxed
+ */
+export async function generateMultipleItineraryOptions(request: GeminiItineraryRequest) {
+    try {
+        const gemini = createGeminiClient();
+
+        // 1. Fetch context destinations
+        let contextDestinations: any[] = [];
+        try {
+            if (request.provinsi) {
+                const destinations = await DestinationService.getByProvince(request.provinsi, 20);
+                contextDestinations = destinations.map(d => serializeFirestoreData(d));
+            } else {
+                const destinations = await DestinationService.getCultural(20);
+                contextDestinations = destinations.map(d => serializeFirestoreData(d));
+            }
+        } catch (dbError) {
+            const apiError = ApiErrorHandler.parse(dbError, 'Destination Fetch');
+            console.warn('⚠️ Could not fetch context destinations:', apiError.message);
+        }
+
+        // 2. Generate 3 themed variations in parallel
+        const themes = [
+            {
+                id: 'cultural',
+                title: 'Budaya & Heritage',
+                description: 'Fokus pada warisan budaya, candi, museum, dan pengalaman tradisional mendalam',
+                preferences: {
+                    cultural_focus: true,
+                    pace: 'moderate' as const,
+                    budget_priority: 'medium' as const
+                }
+            },
+            {
+                id: 'balanced',
+                title: 'Seimbang & Serbaguna',
+                description: 'Kombinasi budaya, kuliner, dan relaksasi dengan pace moderat',
+                preferences: {
+                    cultural_focus: true,
+                    pace: 'moderate' as const,
+                    budget_priority: 'medium' as const
+                }
+            },
+            {
+                id: 'relaxed',
+                title: 'Santai & Fleksibel',
+                description: 'Pace santai dengan banyak waktu luang untuk eksplorasi personal',
+                preferences: {
+                    cultural_focus: false,
+                    pace: 'relaxed' as const,
+                    budget_priority: 'low' as const
+                }
+            }
+        ];
+
+        // Generate sequentially to avoid token limit issues
+        const results = [];
+        for (const theme of themes) {
+            try {
+                const themeRequest = {
+                    ...request,
+                    user_preferences: theme.preferences
+                };
+
+                console.log(`[generateMultipleOptions] Generating ${theme.id} itinerary...`);
+                const itinerary = await gemini.generateItinerary(themeRequest, contextDestinations);
+
+                results.push({
+                    id: theme.id,
+                    theme: theme.id,
+                    title: theme.title,
+                    description: theme.description,
+                    highlights: [
+                        `${itinerary.days.length} hari perjalanan`,
+                        `${itinerary.days.reduce((acc, day) => acc + (day.destinations?.length || 0), 0)} destinasi`,
+                        `Budget: Rp ${itinerary.totalBudget.toLocaleString('id-ID')}`,
+                        theme.id === 'cultural' ? 'Fokus budaya & heritage' :
+                        theme.id === 'balanced' ? 'Mix budaya & kuliner' :
+                        'Pace santai & fleksibel'
+                    ],
+                    itineraryData: itinerary
+                });
+
+                console.log(`[generateMultipleOptions] ✅ Generated ${theme.id} successfully`);
+            } catch (error) {
+                console.error(`[generateMultipleOptions] ❌ Failed to generate ${theme.id}:`, error);
+                // Continue to next theme if one fails
+                continue;
+            }
+        }
+
+        return { success: true, data: results };
+
+    } catch (error) {
+        const apiError = ApiErrorHandler.parse(error, 'Multiple Options Generation');
+        ApiErrorHandler.log(apiError);
+        console.error('Error generating multiple options:', error);
+        return {
+            success: false,
+            error: ApiErrorHandler.getMessage(apiError),
+            details: apiError.details
+        };
+    }
+}
+
 export async function calculateTripRoute(destinations: Array<{ lat: number; lng: number; name: string }>) {
     try {
         if (destinations.length < 2) {

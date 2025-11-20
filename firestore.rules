@@ -13,8 +13,9 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
     match /itineraries/{document=**} {
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      // DEVELOPMENT ONLY - Allow all reads and creates
+      // TODO: Implement proper Firebase Auth and restore secure rules
+      allow read, create: if true;
       allow update, delete: if false;
     }
   }

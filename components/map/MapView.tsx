@@ -88,9 +88,29 @@ export const MapView: React.FC<MapViewProps> = ({
 
   // Initialize map with 3D terrain and vector tiles
   useEffect(() => {
-    // Safety check: ensure container is mounted
-    if (!mapContainer.current) {
-      console.warn('MapView: Container ref not ready, skipping initialization');
+    // Safety check: ensure container is mounted and has proper dimensions
+    if (!mapContainer.current || map.current) {
+      return;
+    }
+
+    // Additional check to ensure the container is actually in the DOM
+    const containerElement = mapContainer.current;
+
+    // Validate container exists and is a proper HTMLElement
+    if (!(containerElement instanceof HTMLElement)) {
+      console.error('MapView: Invalid container element');
+      return;
+    }
+
+    // Check if container is in DOM and has dimensions
+    if (!document.body.contains(containerElement)) {
+      console.warn('MapView: Container not in DOM yet, skipping initialization');
+      return;
+    }
+
+    const rect = containerElement.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) {
+      console.warn('MapView: Container has zero dimensions, skipping initialization');
       return;
     }
 
@@ -178,7 +198,7 @@ export const MapView: React.FC<MapViewProps> = ({
 
       // Create map with proper error handling
       map.current = new MapLibreMap({
-        container: mapContainer.current,
+        container: containerElement,
         style: style,
         center: [center[0], center[1]],
         zoom: zoom,
@@ -191,15 +211,19 @@ export const MapView: React.FC<MapViewProps> = ({
       });
 
       // Add attribution control (custom positioning)
+      // Note: Using a custom class that implements IControl interface instead of extending MapLibreMap
       map.current.addControl(
-        new (class extends MapLibreMap {
+        {
           onAdd() {
             const div = document.createElement('div');
             div.className = 'maplibregl-ctrl maplibregl-ctrl-attrib';
             div.innerHTML = '<button class="maplibregl-ctrl-attrib-button" aria-label="Toggle attribution">©</button><div class="maplibregl-attrib"><p>© OpenStreetMap contributors</p></div>';
             return div;
+          },
+          onRemove() {
+            // Cleanup if needed
           }
-        })(),
+        },
         'bottom-right'
       );
 
@@ -244,23 +268,19 @@ export const MapView: React.FC<MapViewProps> = ({
         map.current.on('load', onLoad);
       }
 
+      // Cleanup function
       return () => {
         if (map.current) {
           map.current.off('load', onLoad);
+          map.current.remove();
+          map.current = null;
         }
+        setMapLoaded(false);
       };
     } catch (error) {
       console.error('Error initializing map:', error);
       setMapLoaded(true);
     }
-
-    return () => {
-      if (map.current) {
-        map.current.remove();
-        map.current = null;
-      }
-      setMapLoaded(false);
-    };
   }, [show3D, pitch, bearing]);
 
   // Update user location marker
@@ -299,6 +319,15 @@ export const MapView: React.FC<MapViewProps> = ({
 
     // Add destination markers
     destinations.forEach((destination, index) => {
+      // Validate coordinates before creating marker
+      const lng = parseFloat(destination.longitude);
+      const lat = parseFloat(destination.latitude);
+
+      if (isNaN(lng) || isNaN(lat)) {
+        console.warn(`Invalid coordinates for destination: ${destination.name}`, { lng, lat });
+        return; // Skip this destination
+      }
+
       const markerElement = document.createElement('div');
       markerElement.className = `w-8 h-8 rounded-full border-2 border-white shadow-lg cursor-pointer flex items-center justify-center text-white font-bold ${destination.isCultural ? 'bg-orange-500' : 'bg-blue-500'
         }`;
@@ -308,7 +337,7 @@ export const MapView: React.FC<MapViewProps> = ({
         element: markerElement,
         anchor: 'bottom'
       })
-        .setLngLat([destination.longitude, destination.latitude])
+        .setLngLat([lng, lat])
         .addTo(map.current!);
 
       // Add popup
@@ -386,15 +415,31 @@ export const MapView: React.FC<MapViewProps> = ({
       if (coordinates && coordinates.length > 0) {
         const bounds = new LngLatBounds();
         coordinates.forEach((coord: [number, number]) => {
-          bounds.extend(coord);
+          // Validate coordinates before extending bounds
+          if (coord && coord.length === 2 && !isNaN(coord[0]) && !isNaN(coord[1])) {
+            bounds.extend(coord);
+          }
         });
-        map.current.fitBounds(bounds, { padding: 50 });
+        // Only fit bounds if we have valid coordinates
+        if (!bounds.isEmpty()) {
+          map.current.fitBounds(bounds, { padding: 50 });
+        }
       }
     }
 
     // Add waypoint markers for route
     if (itineraryRoute.waypoints) {
       itineraryRoute.waypoints.forEach((waypoint, index) => {
+        // Validate coordinates before creating marker
+        const lng = waypoint.location?.lng;
+        const lat = waypoint.location?.lat;
+
+        // Skip if coordinates are invalid
+        if (!lng || !lat || isNaN(lng) || isNaN(lat)) {
+          console.warn(`[MapView] Invalid coordinates for waypoint ${index}:`, waypoint);
+          return;
+        }
+
         const waypointElement = document.createElement('div');
         waypointElement.className = 'w-6 h-6 bg-green-500 border-2 border-white rounded-full flex items-center justify-center text-white font-bold text-xs';
         waypointElement.textContent = (index + 1).toString();
@@ -403,7 +448,7 @@ export const MapView: React.FC<MapViewProps> = ({
           element: waypointElement,
           anchor: 'center'
         })
-          .setLngLat([waypoint.location.lng, waypoint.location.lat])
+          .setLngLat([lng, lat])
           .addTo(map.current!);
       });
     }

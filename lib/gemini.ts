@@ -102,11 +102,29 @@ const itinerarySchema: Schema = {
               type: Type.OBJECT,
               properties: {
                 id: { type: Type.STRING },
-                name: { type: Type.STRING },
+                name: {
+                  type: Type.STRING,
+                  description: "Destination name, max 100 characters"
+                },
                 category: { type: Type.STRING },
                 provinsi: { type: Type.STRING },
                 isCultural: { type: Type.BOOLEAN },
-                description: { type: Type.STRING },
+                description: {
+                  type: Type.STRING,
+                  description: "Brief description, max 300 characters"
+                },
+                rationale: {
+                  type: Type.STRING,
+                  description: "Why recommended, max 200 characters"
+                },
+                openingHours: {
+                  type: Type.STRING,
+                  description: "Opening hours in format HH:MM-HH:MM, max 50 characters"
+                },
+                tips: {
+                  type: Type.STRING,
+                  description: "Practical tips, max 200 characters"
+                },
                 facilities: {
                   type: Type.OBJECT,
                   properties: {
@@ -187,6 +205,7 @@ export class GeminiClient {
 
     this.ai = new GoogleGenAI({ apiKey: key });
     this.model = model;
+    console.log('[Gemini] Using model:', this.model);
   }
 
   /**
@@ -250,6 +269,15 @@ export class GeminiClient {
     request: GeminiItineraryRequest,
     contextDestinations?: any[]
   ): Promise<GeminiItineraryResponse> {
+    // Validate request - check if budget is reasonable
+    const minBudgetPerDay = 100000; // Minimum Rp 100k per day
+    const recommendedBudget = request.duration_days * minBudgetPerDay;
+
+    if (request.budget < recommendedBudget) {
+      console.warn(`[Gemini] Budget Rp ${request.budget.toLocaleString('id-ID')} may be too low for ${request.duration_days} days. Recommended: Rp ${recommendedBudget.toLocaleString('id-ID')}`);
+      // Don't throw error, but log warning - let Gemini try to work with it
+    }
+
     const prompt = this.buildItineraryPrompt(request, contextDestinations);
 
     try {
@@ -260,19 +288,79 @@ export class GeminiClient {
           temperature: 0.7,
           topP: 0.9,
           topK: 40,
-          maxOutputTokens: 8192,
+          // NO maxOutputTokens limit - let it generate fully
           responseMimeType: 'application/json',
           responseSchema: itinerarySchema,
           systemInstruction: this.getSystemInstruction()
         }
       });
 
-      if (!response.text) {
-        throw new Error('No response generated');
+      // Check for finish reason to detect truncation
+      const finishReason = response.candidates?.[0]?.finishReason;
+      if (finishReason === 'MAX_TOKENS') {
+        console.error('[Gemini] Response was truncated due to MAX_TOKENS');
+        console.error('[Gemini] Token usage:', response.usageMetadata);
+        throw new Error('Response was truncated due to token limit. Please try with shorter duration or fewer destinations.');
       }
 
-      // Parse the structured JSON response
-      const itineraryData = JSON.parse(response.text);
+      if (!response.text || response.text.trim().length === 0) {
+        console.error('[Gemini] Empty response received');
+        console.error('[Gemini] Full response object:', JSON.stringify(response, null, 2));
+        throw new Error('No response generated - Gemini returned empty text. This may happen if the request parameters are invalid or the budget is too low.');
+      }
+
+      // Log full response for debugging
+      console.log('[Gemini] Response length:', response.text.length);
+      console.log('[Gemini] First 500 chars:', response.text.substring(0, 500));
+      console.log('[Gemini] Last 500 chars:', response.text.substring(Math.max(0, response.text.length - 500)));
+
+      // Validate JSON is complete before parsing
+      const trimmedResponse = response.text.trim();
+
+      // Check for markdown code blocks wrapping JSON
+      let jsonText = trimmedResponse;
+      if (trimmedResponse.startsWith('```json')) {
+        const match = trimmedResponse.match(/```json\s*([\s\S]*?)\s*```/);
+        if (match && match[1]) {
+          console.log('[Gemini] Detected markdown-wrapped JSON, extracting...');
+          jsonText = match[1].trim();
+        }
+      } else if (trimmedResponse.startsWith('```')) {
+        const match = trimmedResponse.match(/```\s*([\s\S]*?)\s*```/);
+        if (match && match[1]) {
+          console.log('[Gemini] Detected markdown code block, extracting...');
+          jsonText = match[1].trim();
+        }
+      }
+
+      // More lenient JSON validation - check if it looks like JSON structure
+      const trimmedJson = jsonText.trim();
+      const startsWithBrace = trimmedJson.startsWith('{');
+      const endsWithBrace = trimmedJson.endsWith('}');
+
+      if (!startsWithBrace || !endsWithBrace) {
+        console.error('[Gemini] Invalid JSON format after extraction');
+        console.error('[Gemini] Starts with {:', startsWithBrace);
+        console.error('[Gemini] Ends with }:', endsWithBrace);
+        console.error('[Gemini] First 200 chars:', trimmedJson.substring(0, 200));
+        console.error('[Gemini] Last 200 chars:', trimmedJson.substring(Math.max(0, trimmedJson.length - 200)));
+        throw new Error('Response is not valid JSON format');
+      }
+
+      // Use the trimmed version for parsing
+      jsonText = trimmedJson;
+
+      // Parse the structured JSON response (use extracted jsonText)
+      let itineraryData;
+      try {
+        itineraryData = JSON.parse(jsonText);
+        console.log('[Gemini] JSON parsing successful');
+      } catch (parseError) {
+        console.error('[Gemini] JSON parse error:', parseError instanceof Error ? parseError.message : parseError);
+        console.error('[Gemini] Failed to parse JSON. Dumping full response:');
+        console.error(jsonText);
+        throw new Error(`Failed to parse JSON: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`);
+      }
 
       // Add metadata
       const result: GeminiItineraryResponse = {
@@ -291,6 +379,13 @@ export class GeminiClient {
       return result;
 
     } catch (error) {
+      // Handle JSON parsing errors specifically
+      if (error instanceof SyntaxError) {
+        console.error('[Gemini] JSON Parse Error:', error.message);
+        console.error('[Gemini] This usually means the response was truncated or contains invalid JSON');
+        throw new Error('Failed to parse itinerary response. The generated content may be too long. Please try a shorter duration or fewer days.');
+      }
+
       if (error instanceof ApiError) {
         console.error('Gemini API Error:', {
           status: error.status,
@@ -599,13 +694,17 @@ ${existing_destinations.map(dest => `- ${dest.name}`).join('\n')}
     }
 
     prompt += `
-INSTRUKSI KHUSUS:
-1. Pilih destinasi dari database yang tersedia jika memungkinkan
-2. Prioritaskan destinasi budaya (candi, museum, keraton, UMKM lokal)
-3. Hitung budget realistik termasuk transportasi, makan, tiket masuk
-4. Sertakan UMKM lokal (batik, kuliner tradisional, kerajinan)
-5. Berikan tips budaya dan etika berkunjung
-6. Pastikan itinerary feasible dalam ${duration_days} hari
+INSTRUKSI KHUSUS (WAJIB DIIKUTI!):
+1. MAKSIMAL 1-2 destinasi per hari
+2. BATASAN KETAT:
+   - description: MAX 50 karakter!
+   - rationale: HAPUS (tidak perlu)
+   - openingHours: HAPUS (tidak perlu)
+   - tips: HAPUS (tidak perlu)
+   - activities: MAX 2 items per day
+   - tips array: MAX 2-3 items
+   - cultural_notes: MAX 2-3 items
+3. SINGKAT, PADAT, JELAS!
 
 OUTPUT HARUS DALAM FORMAT JSON:
 {
@@ -620,6 +719,9 @@ OUTPUT HARUS DALAM FORMAT JSON:
           "provinsi": "provinsi_name",
           "isCultural": true,
           "description": "Deskripsi singkat",
+          "rationale": "Mengapa destinasi ini direkomendasikan dan signifikansinya",
+          "openingHours": "08:00 - 17:00",
+          "tips": "Tips praktis untuk pengunjung (waktu terbaik berkunjung, etika, dll)",
           "facilities": {
             "wifi": true,
             "toilet": true,

@@ -5,7 +5,6 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, Bookmark, Map } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { ItineraryService } from '@/lib/firestore';
-import { useAuth } from '@/context/AuthContext';
 import type { Itinerary } from '@/types';
 
 interface CollectionsPageProps {
@@ -14,32 +13,70 @@ interface CollectionsPageProps {
 }
 
 export const CollectionsPage: React.FC<CollectionsPageProps> = ({ onBack, onSelectItinerary }) => {
-    const { userId, loading: authLoading } = useAuth();
     const [savedItineraries, setSavedItineraries] = useState<Itinerary[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [userId, setUserId] = useState<string | null>(null);
+
+    useEffect(() => {
+        // Get userId from localStorage (matching HomePage login logic)
+        const storedUser = localStorage.getItem('palapa_user');
+        if (storedUser) {
+            setUserId(storedUser);
+        }
+    }, []);
 
     useEffect(() => {
         const loadItineraries = async () => {
             try {
                 setLoading(true);
+                console.log('[CollectionsPage] Loading itineraries for userId:', userId);
+
                 if (!userId) {
+                    console.warn('[CollectionsPage] No userId found');
                     setError('Silakan login untuk melihat koleksi');
+                    setLoading(false);
                     return;
                 }
+
+                console.log('[CollectionsPage] Calling ItineraryService.getByUserId...');
                 const itineraries = await ItineraryService.getByUserId(userId);
+                console.log('[CollectionsPage] Loaded itineraries:', itineraries.length, 'items');
+                console.log('[CollectionsPage] Itinerary data:', JSON.stringify(itineraries, null, 2));
+
                 setSavedItineraries(itineraries);
+                setError(null);
             } catch (err) {
-                console.error('Error loading itineraries:', err);
-                setError('Gagal memuat koleksi');
+                console.error('[CollectionsPage] Error loading itineraries:', err);
+                console.error('[CollectionsPage] Error details:', {
+                    name: err instanceof Error ? err.name : 'Unknown',
+                    message: err instanceof Error ? err.message : String(err),
+                    code: (err as any)?.code,
+                    stack: err instanceof Error ? err.stack : undefined
+                });
+
+                // Show detailed error message
+                if (err instanceof Error) {
+                    if (err.message.includes('permission')) {
+                        setError('Firestore permissions error - Rules belum di-deploy. Silakan deploy firestore.rules ke Firebase Console.');
+                    } else {
+                        setError(`Error: ${err.message}`);
+                    }
+                } else {
+                    setError('Gagal memuat koleksi');
+                }
             } finally {
                 setLoading(false);
             }
         };
-        if (!authLoading) {
+
+        if (userId) {
             loadItineraries();
+        } else {
+            console.warn('[CollectionsPage] No userId, skipping load');
+            setLoading(false);
         }
-    }, [userId, authLoading]);
+    }, [userId]);
 
     return (
         <motion.div

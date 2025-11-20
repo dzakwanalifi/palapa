@@ -11,11 +11,20 @@ import { CollectionsPage } from '@/components/CollectionsPage'
 import { HomeView } from '@/components/HomeView'
 import { ProfilePage } from '@/components/ProfilePage'
 import { SettingsPage } from '@/components/SettingsPage'
+import { LoginPage } from '@/components/LoginPage'
 import { getInitialDestinations, calculateTripRoute } from '@/app/actions'
 
 export default function HomePage() {
+  // Authentication State
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [currentUser, setCurrentUser] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
   // Main View State: 'beranda' | 'palapa' | 'koleksi'
   const [activeTab, setActiveTab] = useState('beranda')
+
+  // Side Menu State
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   // Side Menu Page State: null | 'umkm' | 'heritage' | 'guides' | 'settings' | 'profile'
   const [activePage, setActivePage] = useState<string | null>(null)
@@ -29,16 +38,51 @@ export default function HomePage() {
   const [route, setRoute] = useState<any>(null)
   const [showItinerary, setShowItinerary] = useState(false)
 
+  // Load login state from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('palapa_user')
+    if (saved) {
+      setCurrentUser(saved)
+      setIsLoggedIn(true)
+    }
+    setIsLoading(false)
+  }, [])
+
   // Fetch initial data
   useEffect(() => {
-    const loadData = async () => {
-      const result = await getInitialDestinations();
-      if (result.success && result.data) {
-        setDestinations(result.data);
-      }
-    };
-    loadData();
-  }, []);
+    if (isLoggedIn) {
+      const loadData = async () => {
+        const result = await getInitialDestinations();
+        if (result.success && result.data) {
+          setDestinations(result.data);
+        }
+      };
+      loadData();
+    }
+  }, [isLoggedIn])
+
+  // Handle Login
+  const handleLoginSuccess = (username: string) => {
+    setCurrentUser(username)
+    setIsLoggedIn(true)
+    localStorage.setItem('palapa_user', username)
+  }
+
+  // Handle Logout
+  const handleLogout = () => {
+    setCurrentUser(null)
+    setIsLoggedIn(false)
+    localStorage.removeItem('palapa_user')
+  }
+
+  // Show login page if not logged in
+  if (isLoading) {
+    return null
+  }
+
+  if (!isLoggedIn) {
+    return <LoginPage onLoginSuccess={handleLoginSuccess} />
+  }
 
   // Handle Tab Change
   const handleTabChange = (tab: string) => {
@@ -119,6 +163,7 @@ export default function HomePage() {
             onCategoryChange={setActiveCategory}
             onMenuNavigate={handleMenuNavigate}
             showItinerary={showItinerary}
+            isMenuOpen={isMenuOpen}
           />
         )}
 
@@ -163,7 +208,14 @@ export default function HomePage() {
         {/* 6. Secondary Pages (UMKM, Heritage, Guides, Profile, Settings) */}
         <AnimatePresence>
           {activePage === 'profile' && (
-            <ProfilePage onBack={() => setActivePage(null)} />
+            <ProfilePage
+              onBack={() => setActivePage(null)}
+              currentUser={currentUser}
+              onLogout={() => {
+                handleLogout()
+                setActivePage(null)
+              }}
+            />
           )}
           {activePage === 'settings' && (
             <SettingsPage onBack={() => setActivePage(null)} />
@@ -178,8 +230,10 @@ export default function HomePage() {
 
       </div>
 
-      {/* 7. Bottom Navigation - Fixed, does not overlap content */}
-      <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
+      {/* 7. Bottom Navigation - Hidden when in Palapa chat, Collections, Result page, or other full-screen pages */}
+      {activeTab !== 'palapa' && activeTab !== 'koleksi' && !activePage && !showItinerary && (
+        <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
+      )}
 
     </div>
   )

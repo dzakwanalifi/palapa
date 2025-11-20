@@ -120,6 +120,12 @@ export class FirestoreService {
     } = {}
   ): Promise<T[]> {
     try {
+      console.log('[FirestoreService] queryDocuments called:', {
+        collectionName,
+        constraintsCount: constraints.length,
+        options
+      });
+
       let q = query(collection(db, collectionName), ...constraints);
 
       if (options.orderBy) {
@@ -130,13 +136,21 @@ export class FirestoreService {
         q = query(q, limit(options.limit));
       }
 
+      console.log('[FirestoreService] Executing query...');
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({
+      console.log('[FirestoreService] Query successful, docs count:', querySnapshot.docs.length);
+
+      const results = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as T[];
+
+      console.log('[FirestoreService] Returning results:', results);
+      return results;
     } catch (error) {
-      console.error(`Error querying ${collectionName}:`, error);
+      console.error(`[FirestoreService] Error querying ${collectionName}:`, error);
+      console.error('[FirestoreService] Error type:', error instanceof Error ? error.constructor.name : typeof error);
+      console.error('[FirestoreService] Error message:', error instanceof Error ? error.message : String(error));
       throw error;
     }
   }
@@ -310,14 +324,22 @@ export class ItineraryService {
   }
 
   static async getByUserId(userId: string, limit = 20): Promise<Itinerary[]> {
-    return FirestoreService.queryDocuments<Itinerary>(
-      COLLECTIONS.ITINERARIES,
-      [where('userId', '==', userId)],
-      {
-        limit,
-        orderBy: { field: 'createdAt', direction: 'desc' }
-      }
-    );
+    console.log('[ItineraryService] getByUserId called with:', { userId, limit });
+    try {
+      const result = await FirestoreService.queryDocuments<Itinerary>(
+        COLLECTIONS.ITINERARIES,
+        [where('userId', '==', userId)],
+        {
+          limit,
+          orderBy: { field: 'createdAt', direction: 'desc' }
+        }
+      );
+      console.log('[ItineraryService] getByUserId result:', result.length, 'items');
+      return result;
+    } catch (error) {
+      console.error('[ItineraryService] getByUserId error:', error);
+      throw error;
+    }
   }
 
   static async create(itinerary: Omit<Itinerary, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
