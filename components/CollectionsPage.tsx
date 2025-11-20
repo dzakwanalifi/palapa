@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, Bookmark, Map } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { ItineraryService } from '@/lib/firestore';
+import { useAuth } from '@/context/AuthContext';
 import type { Itinerary } from '@/types';
 
 interface CollectionsPageProps {
@@ -13,6 +14,7 @@ interface CollectionsPageProps {
 }
 
 export const CollectionsPage: React.FC<CollectionsPageProps> = ({ onBack, onSelectItinerary }) => {
+    const { userId, loading: authLoading } = useAuth();
     const [savedItineraries, setSavedItineraries] = useState<Itinerary[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -21,9 +23,10 @@ export const CollectionsPage: React.FC<CollectionsPageProps> = ({ onBack, onSele
         const loadItineraries = async () => {
             try {
                 setLoading(true);
-                // For now, load all itineraries. In production, filter by current user ID
-                // TODO: Get current user ID from Firebase Auth
-                const userId = 'demo-user'; // Placeholder
+                if (!userId) {
+                    setError('Silakan login untuk melihat koleksi');
+                    return;
+                }
                 const itineraries = await ItineraryService.getByUserId(userId);
                 setSavedItineraries(itineraries);
             } catch (err) {
@@ -33,15 +36,17 @@ export const CollectionsPage: React.FC<CollectionsPageProps> = ({ onBack, onSele
                 setLoading(false);
             }
         };
-        loadItineraries();
-    }, []);
+        if (!authLoading) {
+            loadItineraries();
+        }
+    }, [userId, authLoading]);
 
     return (
         <motion.div
             initial={{ opacity: 0, x: '100%' }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: '100%' }}
-            className="fixed inset-0 z-40 bg-slate-50 flex flex-col"
+            className="absolute inset-0 z-40 bg-slate-50 flex flex-col"
         >
             {/* Header */}
             <div className="bg-white px-6 pt-6 pb-4 shadow-sm z-10">

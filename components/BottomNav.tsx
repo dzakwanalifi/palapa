@@ -10,7 +10,7 @@ interface BottomNavProps {
 
 export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange }) => {
     return (
-        <nav className="fixed bottom-0 left-0 right-0 z-50 h-[90px] bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.05)] rounded-t-[30px] px-8 pb-2 flex items-center justify-around">
+        <nav className="fixed bottom-0 left-0 right-0 z-50 h-[90px] bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.05)] px-8 pb-2 flex items-center justify-around">
 
             {/* Beranda */}
             <button
@@ -25,9 +25,9 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange }) 
                 </span>
             </button>
 
-            {/* Palapabot - Floating Action Button */}
+            {/* Palapa Bot - Floating Action Button */}
             <button
-                onClick={() => onTabChange('palapabot')}
+                onClick={() => onTabChange('palapa')}
                 className="relative -top-8 group"
             >
                 <div className="w-[72px] h-[72px] rounded-full bg-gradient-to-br from-[#3B6ACE] to-[#1E3568] shadow-[0_8px_20px_rgba(59,106,206,0.4)] flex items-center justify-center transition-transform group-hover:scale-105 group-active:scale-95 border-4 border-slate-50">

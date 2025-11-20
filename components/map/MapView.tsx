@@ -32,8 +32,59 @@ export const MapView: React.FC<MapViewProps> = ({
   const map = useRef<MapLibreMap | null>(null);
   const markers = useRef<Marker[]>([]);
   const routeLayer = useRef<string | null>(null);
+  const userLocationMarker = useRef<Marker | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [terrain3DEnabled, setTerrain3DEnabled] = useState(show3D);
+  const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+
+  // Get user's current location and center map
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const userCoords: [number, number] = [position.coords.longitude, position.coords.latitude];
+          setUserLocation(userCoords);
+
+          // Center and zoom map to user location
+          if (map.current && mapLoaded) {
+            map.current.flyTo({
+              center: userCoords,
+              zoom: 15,
+              duration: 1000
+            });
+          }
+        },
+        (error) => {
+          console.log('Geolocation error:', error);
+          // Use default Yogyakarta location if geolocation fails
+          const defaultCoords: [number, number] = [110.3695, -7.7956];
+          setUserLocation(defaultCoords);
+
+          // Center and zoom map to default location
+          if (map.current && mapLoaded) {
+            map.current.flyTo({
+              center: defaultCoords,
+              zoom: 13,
+              duration: 1000
+            });
+          }
+        }
+      );
+    } else {
+      // Use default Yogyakarta location if geolocation not available
+      const defaultCoords: [number, number] = [110.3695, -7.7956];
+      setUserLocation(defaultCoords);
+
+      // Center and zoom map to default location
+      if (map.current && mapLoaded) {
+        map.current.flyTo({
+          center: defaultCoords,
+          zoom: 13,
+          duration: 1000
+        });
+      }
+    }
+  }, [mapLoaded]);
 
   // Initialize map with 3D terrain and vector tiles
   useEffect(() => {
@@ -212,11 +263,37 @@ export const MapView: React.FC<MapViewProps> = ({
     };
   }, [show3D, pitch, bearing]);
 
+  // Update user location marker
+  useEffect(() => {
+    if (!map.current || !userLocation) return;
+
+    // Remove existing user location marker
+    if (userLocationMarker.current) {
+      userLocationMarker.current.remove();
+    }
+
+    // Create user location marker
+    const userMarkerElement = document.createElement('div');
+    userMarkerElement.className = 'w-6 h-6 bg-blue-600 rounded-full border-3 border-white shadow-lg';
+
+    // Add inner pulse circle
+    const pulseElement = document.createElement('div');
+    pulseElement.className = 'absolute inset-0 bg-blue-600 rounded-full animate-pulse';
+    userMarkerElement.appendChild(pulseElement);
+
+    userLocationMarker.current = new Marker({
+      element: userMarkerElement,
+      anchor: 'center'
+    })
+      .setLngLat(userLocation)
+      .addTo(map.current);
+  }, [userLocation]);
+
   // Update destinations markers
   useEffect(() => {
     if (!map.current) return;
 
-    // Clear existing markers
+    // Clear existing markers (except user location marker)
     markers.current.forEach(marker => marker.remove());
     markers.current = [];
 
@@ -378,6 +455,10 @@ export const MapView: React.FC<MapViewProps> = ({
       <div className="absolute bottom-4 left-4 bg-white p-3 rounded-lg shadow-lg z-10 text-xs max-w-xs">
         <h4 className="font-bold text-gray-800 mb-2">Legenda</h4>
         <div className="space-y-1 text-gray-700">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-blue-600 rounded-full border-2 border-white animate-pulse"></div>
+            <span>Lokasi Anda</span>
+          </div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 bg-orange-500 rounded-full border border-white"></div>
             <span>Destinasi Budaya</span>

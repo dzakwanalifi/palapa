@@ -15,7 +15,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onBack }) => {
             initial={{ opacity: 0, x: '100%' }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: '100%' }}
-            className="fixed inset-0 z-40 bg-slate-50 flex flex-col"
+            className="absolute inset-0 z-40 bg-slate-50 flex flex-col"
         >
             {/* Header */}
             <div className="bg-white px-6 pt-6 pb-4 shadow-sm z-10 flex items-center gap-4">

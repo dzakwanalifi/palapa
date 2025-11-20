@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import { Providers } from './providers'
 
 export const metadata: Metadata = {
   title: 'PALAPA - Budaya GO',
@@ -14,7 +15,9 @@ export default function RootLayout({
   return (
     <html lang="id">
       <body className="antialiased bg-white" suppressHydrationWarning>
-        {children}
+        <Providers>
+          {children}
+        </Providers>
       </body>
     </html>
   )

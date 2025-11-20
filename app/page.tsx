@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react'
 import { BottomNav } from '@/components/BottomNav'
 import { MapView } from '@/components/map/MapView'
 import { AnimatePresence } from 'framer-motion'
-import { ChatOverlay } from '@/components/ChatOverlay'
-import { ItineraryView } from '@/components/ItineraryView'
+import { PalapaBotChat } from '@/components/PalapaBotChat'
+import { ResultPage } from '@/components/ResultPage'
 import { GenericListPage } from '@/components/GenericListPage'
 import { CollectionsPage } from '@/components/CollectionsPage'
 import { HomeView } from '@/components/HomeView'
@@ -91,80 +91,94 @@ export default function HomePage() {
   };
 
   return (
-    <div className="relative w-full h-[100dvh] overflow-hidden bg-slate-50 flex flex-col">
+    <div className="w-full h-[100dvh] overflow-hidden bg-slate-50 flex flex-col relative">
 
-      {/* 1. Background Map Layer - Only visible in Home tab */}
-      <div className="absolute inset-0 z-0">
-        <MapView
-          className="w-full h-full"
-          center={[110.3695, -7.7956]} // Yogyakarta
-          zoom={11}
-          destinations={destinations}
-          itineraryRoute={route}
-        />
-        {/* Gradient overlays */}
-        <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-white/90 via-white/60 to-transparent pointer-events-none" />
-        <div className="absolute bottom-0 left-0 right-0 h-64 bg-gradient-to-t from-white via-white/80 to-transparent pointer-events-none" />
+      {/* Main Content Area - Takes up space above navbar */}
+      <div className="flex-1 relative overflow-hidden">
+
+        {/* 1. Background Map Layer - Only visible in Home tab */}
+        {activeTab === 'beranda' && !activePage && !showItinerary && (
+          <div className="absolute inset-0 z-0">
+            <MapView
+              className="w-full h-full"
+              center={[110.3695, -7.7956]}
+              zoom={13}
+              destinations={destinations}
+              itineraryRoute={route}
+            />
+          </div>
+        )}
+
+        {/* 2. Main UI Layer (Home Tab) */}
+        {activeTab === 'beranda' && !activePage && (
+          <HomeView
+            destinations={destinations}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            activeCategory={activeCategory}
+            onCategoryChange={setActiveCategory}
+            onMenuNavigate={handleMenuNavigate}
+            showItinerary={showItinerary}
+          />
+        )}
+
+        {/* 3. Result Page (Full-screen itinerary view) */}
+        <AnimatePresence>
+          {activeTab === 'beranda' && showItinerary && (
+            <ResultPage
+              itinerary={itinerary}
+              route={route}
+              destinations={destinations}
+              onBack={() => setShowItinerary(false)}
+              onStart={() => {
+                console.log('Starting itinerary...');
+              }}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* 4. Chat Interface (Palapa Bot Tab) */}
+        <AnimatePresence>
+          {activeTab === 'palapa' && (
+            <PalapaBotChat
+              onBack={() => setActiveTab('beranda')}
+              onItineraryGenerated={handleItineraryGenerated}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* 5. Collections Page (Koleksi Tab) */}
+        <AnimatePresence>
+          {activeTab === 'koleksi' && (
+            <CollectionsPage
+              onBack={() => setActiveTab('beranda')}
+              onSelectItinerary={(saved) => {
+                console.log('Load itinerary:', saved);
+                setActiveTab('beranda');
+              }}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* 6. Secondary Pages (UMKM, Heritage, Guides, Profile, Settings) */}
+        <AnimatePresence>
+          {activePage === 'profile' && (
+            <ProfilePage onBack={() => setActivePage(null)} />
+          )}
+          {activePage === 'settings' && (
+            <SettingsPage onBack={() => setActivePage(null)} />
+          )}
+          {['umkm', 'heritage', 'guides'].includes(activePage || '') && (
+            <GenericListPage
+              type={activePage as any}
+              onBack={() => setActivePage(null)}
+            />
+          )}
+        </AnimatePresence>
+
       </div>
 
-      {/* 2. Main UI Layer (Home Tab) */}
-      {activeTab === 'beranda' && !activePage && (
-        <HomeView
-          destinations={destinations}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          activeCategory={activeCategory}
-          onCategoryChange={setActiveCategory}
-          onMenuNavigate={handleMenuNavigate}
-          showItinerary={showItinerary}
-        />
-      )}
-
-      {/* 3. Itinerary View Overlay (Home Tab) */}
-      <AnimatePresence>
-        {activeTab === 'beranda' && showItinerary && (
-          <ItineraryView
-            itinerary={itinerary}
-            onClose={() => setShowItinerary(false)}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* 4. Chat Overlay (Palapa Bot Tab) */}
-      <div className={activeTab === 'palapa' ? 'block' : 'hidden'}>
-        <ChatOverlay onItineraryGenerated={handleItineraryGenerated} />
-      </div>
-
-      {/* 5. Collections Page (Koleksi Tab) */}
-      <AnimatePresence>
-        {activeTab === 'koleksi' && (
-          <CollectionsPage
-            onBack={() => setActiveTab('beranda')}
-            onSelectItinerary={(saved) => {
-              console.log('Load itinerary:', saved);
-              setActiveTab('beranda');
-            }}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* 6. Secondary Pages (UMKM, Heritage, Guides, Profile, Settings) */}
-      <AnimatePresence>
-        {activePage === 'profile' && (
-          <ProfilePage onBack={() => setActivePage(null)} />
-        )}
-        {activePage === 'settings' && (
-          <SettingsPage onBack={() => setActivePage(null)} />
-        )}
-        {['umkm', 'heritage', 'guides'].includes(activePage || '') && (
-          <GenericListPage
-            type={activePage as any}
-            onBack={() => setActivePage(null)}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* 7. Bottom Navigation */}
+      {/* 7. Bottom Navigation - Fixed, does not overlap content */}
       <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
 
     </div>
