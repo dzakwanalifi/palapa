@@ -111,12 +111,32 @@ export default function HomePage() {
       }
     });
 
-    // Update map markers
-    const validDestinations = allDestinations.map(d => ({
-      ...d,
-      latitude: d.latitude || -7.7956 + (Math.random() - 0.5) * 0.1,
-      longitude: d.longitude || 110.3695 + (Math.random() - 0.5) * 0.1
-    }));
+    // Update map markers - handle both object {lat, lng} and array [lng, lat] formats
+    const validDestinations = allDestinations.map(d => {
+      let lat, lng;
+
+      // Check if location is an array [longitude, latitude]
+      if (Array.isArray(d.location) && d.location.length === 2) {
+        lng = parseFloat(d.location[0]);
+        lat = parseFloat(d.location[1]);
+      }
+      // Check if latitude/longitude are direct properties
+      else if (d.latitude && d.longitude) {
+        lat = parseFloat(d.latitude);
+        lng = parseFloat(d.longitude);
+      }
+      // Fallback to default Yogyakarta coordinates
+      else {
+        lat = -7.7956 + (Math.random() - 0.5) * 0.1;
+        lng = 110.3695 + (Math.random() - 0.5) * 0.1;
+      }
+
+      return {
+        ...d,
+        latitude: lat,
+        longitude: lng
+      };
+    });
 
     setDestinations(validDestinations);
 

@@ -50,16 +50,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
   return (
     <div className="w-full h-[100dvh] bg-[#FDFDFD] flex flex-col overflow-hidden">
-      {/* Status Bar */}
-      <div className="w-full bg-white px-4 py-2 text-xs flex justify-between items-center">
-        <span className="text-[#000000]">9:41</span>
-        <div className="flex gap-1">
-          <span>📶</span>
-          <span>📡</span>
-          <span>🔋</span>
-        </div>
-      </div>
-
       {/* Main Content - Scrollable */}
       <div className="flex-1 overflow-y-auto flex flex-col items-center justify-center">
         <div className="flex flex-col w-full max-w-md">

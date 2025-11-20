@@ -134,18 +134,18 @@ export const ItineraryConfirmationSummary: React.FC<ItineraryConfirmationSummary
         <Button
           onClick={onConfirm}
           disabled={isLoading}
-          className="flex-1 h-12 rounded-full bg-[#0070F0] hover:bg-[#0060D0] text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 h-12 rounded-full bg-[#0070F0] hover:bg-[#0060D0] text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center overflow-hidden"
         >
           {isLoading ? (
-            <>
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-              Membuat Itinerary...
-            </>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin flex-shrink-0" />
+              <span className="whitespace-nowrap">Membuat...</span>
+            </div>
           ) : (
-            <>
-              <CheckCircle size={18} className="mr-2" />
-              Buat Itinerary
-            </>
+            <div className="flex items-center gap-2">
+              <CheckCircle size={18} className="flex-shrink-0" />
+              <span className="whitespace-nowrap">Buat Itinerary</span>
+            </div>
           )}
         </Button>
       </div>
